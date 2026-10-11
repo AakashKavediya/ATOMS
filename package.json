@@ -1,0 +1,37 @@
+{
+  "name": "atoms",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-shell": "^2.5.0",
+    "@tauri-apps/plugin-store": "^2.5.0",
+    "axios": "^1.20.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "^1.55.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-redux": "^9.3.0",
+    "react-router-dom": "^7.18.4",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@tauri-apps/cli": "^2",
+    "@vitejs/plugin-react": "^6.0.2",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.29",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.0.16"
+  }
+}

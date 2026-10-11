@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* Optional: custom theme colors matching your ATOMS design */
+@theme {
+  --color-brand-50: #fff8f1;
+  --color-brand-100: #ffebdc;
+  --color-brand-500: #e99b7c;
+  --color-brand-600: #cc7964;
+}
+
+@custom-variant dark (&:is(.dark *));

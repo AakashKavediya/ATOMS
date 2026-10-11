@@ -1,6 +1,6 @@
 // ==========================================
 // Auth slice — Redux Toolkit
-// Handles: login, register, Google sign-in, logout, session restore
+// Handles: login, register, Google sign-in, logout, session restore, demo login
 // ==========================================
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
@@ -13,6 +13,51 @@ import {
   loadUser,
 } from '../../lib/secureStore';
 import { ROLES } from '../../lib/constants';
+
+// ==========================================
+// Demo accounts — frontend-only preview
+// ==========================================
+export const DEMO_ACCOUNTS = [
+  {
+    role: 'HOD',
+    email: 'hod@somaiya.edu',
+    password: 'demo123',
+    user: {
+      id: 'demo-hod-001',
+      email: 'hod@somaiya.edu',
+      name: 'Dr. Rajesh Shah',
+      picture: null,
+      role: 'HOD',
+      status: 'ACTIVE',
+    },
+  },
+  {
+    role: 'TEACHER',
+    email: 'teacher@somaiya.edu',
+    password: 'demo123',
+    user: {
+      id: 'demo-teacher-001',
+      email: 'teacher@somaiya.edu',
+      name: 'Prof. Neha Gupta',
+      picture: null,
+      role: 'TEACHER',
+      status: 'ACTIVE',
+    },
+  },
+  {
+    role: 'STUDENT',
+    email: 'student@somaiya.edu',
+    password: 'demo123',
+    user: {
+      id: 'demo-student-001',
+      email: 'student@somaiya.edu',
+      name: 'Sneha Kulkarni',
+      picture: null,
+      role: 'STUDENT',
+      status: 'ACTIVE',
+    },
+  },
+];
 
 // ==========================================
 // Async Thunks
@@ -42,7 +87,7 @@ export const signInWithGoogle = createAsyncThunk(
 );
 
 /**
- * Sign in with email + password.
+ * Sign in with email + password (real backend).
  */
 export const signInWithPassword = createAsyncThunk(
   'auth/signInWithPassword',
@@ -91,6 +136,35 @@ export const registerAccount = createAsyncThunk(
 );
 
 /**
+ * Demo login — bypasses the backend entirely.
+ * Matches credentials against DEMO_ACCOUNTS.
+ */
+export const loginAsDemo = createAsyncThunk(
+  'auth/loginAsDemo',
+  async ({ email, password }, { rejectWithValue }) => {
+    const account = DEMO_ACCOUNTS.find(
+      (a) => a.email.toLowerCase() === email.toLowerCase().trim()
+    );
+
+    if (!account) {
+      return rejectWithValue('No demo account found for this email');
+    }
+
+    if (account.password !== password) {
+      return rejectWithValue('Incorrect demo password');
+    }
+
+    // Persist the demo user so session restore works
+    await saveUser(account.user);
+
+    // Simulate a tiny delay so the loading state is visible
+    await new Promise((r) => setTimeout(r, 250));
+
+    return account.user;
+  }
+);
+
+/**
  * Restore session on app startup — reads tokens + user from storage.
  */
 export const restoreSession = createAsyncThunk(
@@ -98,18 +172,33 @@ export const restoreSession = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const { access_token } = await loadTokens();
-      if (!access_token) return null;
 
-      const cachedUser = await loadUser();
+      // No access token → check if there's a demo user stored
+      if (!access_token) {
+        const cachedUser = await loadUser();
+        if (cachedUser && cachedUser.id?.startsWith('demo-')) {
+          // Valid demo session
+          return cachedUser;
+        }
+        return null;
+      }
 
-      // Validate the token by hitting /auth/me
+      // Real session → validate with backend
       const { data } = await api.get('/auth/me');
       const user = data.user;
 
       await saveUser(user);
       return user;
     } catch (err) {
-      // Token invalid/expired & refresh failed → clear everything
+      // Fall back to cached demo user if backend is unreachable
+      try {
+        const cachedUser = await loadUser();
+        if (cachedUser && cachedUser.id?.startsWith('demo-')) {
+          return cachedUser;
+        }
+      } catch {
+        // ignore
+      }
       await clearTokens();
       return rejectWithValue('Session expired');
     }
@@ -142,8 +231,8 @@ const initialState = {
   user: null,
   accessToken: null,
   isAuthenticated: false,
-  isLoading: false,       // for login/register actions
-  isBootstrapping: true,  // true until restoreSession finishes
+  isLoading: false,
+  isBootstrapping: true,
   error: null,
 };
 
@@ -151,16 +240,9 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    /**
-     * Manually clear error (e.g., when user starts typing).
-     */
     clearAuthError: (state) => {
       state.error = null;
     },
-
-    /**
-     * Update user (e.g., after profile edit).
-     */
     setUser: (state, action) => {
       state.user = action.payload;
       saveUser(action.payload);
@@ -218,6 +300,23 @@ const authSlice = createSlice({
         state.error = action.payload || 'Registration failed';
       });
 
+    // --------- Demo Login ---------
+    builder
+      .addCase(loginAsDemo.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginAsDemo.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.user = action.payload;
+        state.isAuthenticated = true;
+        state.error = null;
+      })
+      .addCase(loginAsDemo.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload || 'Demo login failed';
+      });
+
     // --------- Session Restore ---------
     builder
       .addCase(restoreSession.pending, (state) => {
@@ -240,13 +339,12 @@ const authSlice = createSlice({
       });
 
     // --------- Logout ---------
-    builder
-      .addCase(logoutUser.fulfilled, (state) => {
-        state.user = null;
-        state.accessToken = null;
-        state.isAuthenticated = false;
-        state.error = null;
-      });
+    builder.addCase(logoutUser.fulfilled, (state) => {
+      state.user = null;
+      state.accessToken = null;
+      state.isAuthenticated = false;
+      state.error = null;
+    });
   },
 });
 
